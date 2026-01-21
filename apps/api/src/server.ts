@@ -36,12 +36,13 @@ app.get("/marks", async (_req: Request, res: Response) => {
     const now = Date.now();
 
     // Active marks: score in (now .. +inf)
-    const ids = await redis.zrange<string>(
-      "marks_by_expiry",
-      String(now),
-      "+inf",
-      { byScore: true, limit: { offset: 0, count: 2000 } }
-    );
+    const ids = (await redis.zrange(
+        "marks_by_expiry",
+        String(now),
+        "+inf",
+        { byScore: true, limit: { offset: 0, count: 2000 } }
+      )) as string[];
+
 
     if (!ids.length) return res.json([]);
 
@@ -133,12 +134,13 @@ setInterval(() => {
       const now = Date.now();
 
       // Беремо пачкою, щоб не зробити великий burst
-      const expiredIds = await redis.zrange<string>(
-        "marks_by_expiry",
-        "-inf",
-        String(now),
-        { byScore: true, limit: { offset: 0, count: 1000 } }
-      );
+      const expiredIds = (await redis.zrange(
+            "marks_by_expiry",
+            "-inf",
+            String(now),
+            { byScore: true, limit: { offset: 0, count: 1000 } }
+          )) as string[];
+
 
       if (!expiredIds.length) return;
 
