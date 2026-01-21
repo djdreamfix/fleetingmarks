@@ -38,9 +38,9 @@ app.get("/marks", async (_req: Request, res: Response) => {
     // Active marks: score in (now .. +inf)
     const ids = (await redis.zrange(
         "marks_by_expiry",
-        String(now),
+        now,
         "+inf",
-        { byScore: true, limit: { offset: 0, count: 2000 } }
+        { byScore: true,  offset: 0, count: 2000  }
       )) as string[];
 
 
@@ -137,8 +137,8 @@ setInterval(() => {
       const expiredIds = (await redis.zrange(
             "marks_by_expiry",
             "-inf",
-            String(now),
-            { byScore: true, limit: { offset: 0, count: 1000 } }
+            now,
+            { byScore: true, offset: 0, count: 1000 }
           )) as string[];
 
 
