@@ -49,8 +49,8 @@ app.get("/marks", async (_req: Request, res: Response) => {
     const raw = await Promise.all(ids.map((id) => redis.get<string>(`mark:${id}`)));
 
     const marks: Mark[] = raw
-      .filter((v): v is string => Boolean(v))
-      .map((s) => JSON.parse(s) as Mark)
+      .filter((v): v is string => typeof v === "string")
+      .map((s: string) => JSON.parse(s) as Mark)
       .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt));
 
     return res.json(marks);
