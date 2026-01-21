@@ -1,5 +1,5 @@
 {
-  "name": "fleeting-marks",
+  "name": "fleetingmarks",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -8,7 +8,6 @@
   "scripts": {
     "build": "npm --workspace apps/web run build && npm --workspace apps/api run build",
     "dev:web": "npm --workspace apps/web run dev",
-    "dev:api": "npm --workspace apps/api run dev",
-    "zip": "git ls-files | zip -@ fleeting-marks.zip"
+    "dev:api": "npm --workspace apps/api run dev"
   }
 }

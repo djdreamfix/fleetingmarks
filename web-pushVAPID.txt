@@ -1,0 +1,4 @@
+{
+  publicKey: 'BLc320tHLnZ1I-VDyJXM5xXKKSmohB0ZqAQmCAq9RXaRLBbcILR9JG9fhMDbwhyVD8EdshvbCGqKO8r-dY7SEx8',
+  privateKey: 'gOERJuuAPM8eEjgZ3J4RBPE8hK2JGwW_sFQt2AhaQho'
+}
