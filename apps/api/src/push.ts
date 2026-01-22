@@ -39,30 +39,26 @@ export async function saveSubscription(sub: PushSubscriptionRecord) {
 
 // ---------------- SEND ----------------
 
-export async function broadcastPush(payload: string) {
+export async function broadcastPush(
+  title: string,
+  body: string,
+  data?: Record<string, unknown>
+) {
   initWebPush();
   if (webPushDisabled) return;
+
+  const payload = JSON.stringify({ title, body, data, icon: "/icons/icon-192.png" });
 
   const raw = await redis.smembers("push:subs");
 
   const subs: PushSubscriptionRecord[] = raw
     .map((x: any) => {
       if (!x) return null;
-
-      // Upstash may already return parsed objects
-      if (typeof x === "object") return x;
-
+      if (typeof x === "object") return x; // Upstash може повернути вже об’єкт
       if (typeof x === "string") {
-        // skip garbage like "[object Object]"
-        if (!x.trim().startsWith("{")) return null;
-
-        try {
-          return JSON.parse(x);
-        } catch {
-          return null;
-        }
+        if (!x.trim().startsWith("{")) return null; // відсікаємо "[object Object]"
+        try { return JSON.parse(x); } catch { return null; }
       }
-
       return null;
     })
     .filter(Boolean);
@@ -70,15 +66,11 @@ export async function broadcastPush(payload: string) {
   await Promise.allSettled(
     subs.map(async (rec) => {
       try {
-        const sub: PushSubscription = {
-          endpoint: rec.endpoint,
-          keys: rec.keys,
-        };
-
+        const sub: PushSubscription = { endpoint: rec.endpoint, keys: rec.keys };
         await webpush.sendNotification(sub, payload);
       } catch (e: any) {
         if (shouldRemoveSubscription(e)) {
-          // remove broken subscription
+          // безпечне прибирання: видаляємо і рядок, і можливий об’єктний варіант
           await redis.srem("push:subs", JSON.stringify(rec));
         } else {
           console.warn("[web-push] send failed (kept sub):", e);
@@ -87,7 +79,6 @@ export async function broadcastPush(payload: string) {
     })
   );
 }
-
 // ---------------- HELPERS ----------------
 
 function shouldRemoveSubscription(e: any) {
