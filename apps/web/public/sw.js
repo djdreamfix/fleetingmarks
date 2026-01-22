@@ -1,67 +1,61 @@
 /* global self */
-const CACHE = 'fm-cache-v1';
-const ORIGIN = self.location.origin;
+const CACHE = "fm-cache-v3";
 
-// Install: precache basic assets
-self.addEventListener('install', (event) => {
+// Install: cache only same-origin essentials
+self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) =>
       cache.addAll([
-        '/',
-        '/index.html',
-        '/manifest.webmanifest',
-        '/icons/icon-192.png',
-        '/icons/icon-512.png'
+        "/",
+        "/index.html",
+        "/manifest.webmanifest",
+        "/icons/icon-192.png",
+        "/icons/icon-512.png",
       ])
     )
   );
   self.skipWaiting();
 });
 
-// Activate
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
-});
-
-// Runtime cache for map tiles (simple)
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  if (url.hostname.includes('tile.openstreetmap.org')) {
-    event.respondWith(
-      caches.open(CACHE).then(async (cache) => {
-        const cached = await cache.match(event.request);
-        if (cached) return cached;
-        const res = await fetch(event.request);
-        cache.put(event.request, res.clone());
-        return res;
-      })
-    );
-  }
-});
-
-// Push handler
-self.addEventListener('push', (event) => {
-  if (!event.data) return;
-  const payload = event.data.json();
-  const { title, body, icon, data } = payload;
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    self.registration.showNotification(title || 'Повідомлення', {
-      body,
-      icon: icon || '/icons/icon-192.png',
-      data
-    })
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => (k === CACHE ? null : caches.delete(k))));
+      await self.clients.claim();
+    })()
   );
 });
 
-// Notification click
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const url = ORIGIN + '/';
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then((clientsArr) => {
-      const hadWindow = clientsArr.find((c) => c.url === url);
-      if (hadWindow) return hadWindow.focus();
-      return self.clients.openWindow(url);
-    })
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  // 1) Не чіпаємо cross-origin взагалі (OSM tiles, API на іншому домені тощо)
+  if (url.origin !== self.location.origin) return;
+
+  // 2) Не кешуємо не-GET
+  if (req.method !== "GET") return;
+
+  // 3) Не кешуємо API/WS маршрути (адаптуй, якщо інші)
+  if (url.pathname.startsWith("/marks") || url.pathname.startsWith("/socket.io")) {
+    return;
+  }
+
+  // 4) Cache-first для статики
+  event.respondWith(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      const cached = await cache.match(req);
+      if (cached) return cached;
+
+      const res = await fetch(req);
+
+      // Кешуємо лише "basic" same-origin відповіді
+      if (res && res.ok && res.type === "basic") {
+        cache.put(req, res.clone());
+      }
+      return res;
+    })()
   );
 });
