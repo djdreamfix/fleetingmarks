@@ -52,7 +52,7 @@ app.get("/marks", async (_req: Request, res: Response) => {
       "marks_by_expiry",
       now,
       "+inf",
-      { byScore: true, limit: { offset: 0, count: 2000 } }
+     { byScore: true, offset: 0, count: 2000 }
     )) as string[];
 
     if (!ids.length) return res.json([]);
@@ -150,7 +150,7 @@ setInterval(() => {
         "marks_by_expiry",
         "-inf",
         now,
-        { byScore: true, limit: { offset: 0, count: 1000 } }
+       { byScore: true, offset: 0, count: 1000 }
       )) as string[];
 
       if (!expiredIds.length) return;
