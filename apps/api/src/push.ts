@@ -54,26 +54,22 @@ export async function broadcastPush(
   const raw = await redis.smembers("push:subs");
 
   // normalize: Upstash може повернути або string, або object
-  const subs: PushSubscriptionRecord[] = raw
-    .map((x: any) => {
-      if (!x) return null;
-
-      if (typeof x === "object") return x as PushSubscriptionRecord;
-
-      if (typeof x === "string") {
-        // відсікаємо "[object Object]" та інший сміттєвий рядок
-        const s = x.trim();
-        if (!s.startsWith("{")) return null;
-        try {
-          return JSON.parse(s) as PushSubscriptionRecord;
-        } catch {
-          return null;
-        }
+  const subs = raw
+  .map((x: any): PushSubscriptionRecord | null => {
+    if (!x) return null;
+    if (typeof x === "object") return x as PushSubscriptionRecord;
+    if (typeof x === "string") {
+      const s = x.trim();
+      if (!s.startsWith("{")) return null;
+      try {
+        return JSON.parse(s) as PushSubscriptionRecord;
+      } catch {
+        return null;
       }
-
-      return null;
-    })
-    .filter(Boolean);
+    }
+    return null;
+  })
+  .filter((v): v is PushSubscriptionRecord => v !== null);
 
   // Надсилаємо паралельно, але не валимо процес
   await Promise.allSettled(
