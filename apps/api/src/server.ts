@@ -30,27 +30,39 @@ function isValidColor(color: unknown): color is MarkColor {
   return color === "blue" || color === "green" || color === "split";
 }
 
+// Small helper for optional Upstash methods not present in typings
+type RedisCompat = typeof redis & {
+  zremrangebyscore?: (key: string, min: string, max: string) => Promise<number>;
+};
+
+const r = redis as RedisCompat;
+
 // Snapshot of active marks (expiresAtMs > now)
 app.get("/marks", async (_req: Request, res: Response) => {
   try {
     const now = Date.now();
 
+    // Proactively clean expired ids from index (safe even if keys already TTL'd)
+    if (typeof r.zremrangebyscore === "function") {
+      await r.zremrangebyscore("marks_by_expiry", "-inf", String(now));
+    }
+
     // Active marks: score in (now .. +inf)
     const ids = (await redis.zrange(
-        "marks_by_expiry",
-        now,
-        "+inf",
-        { byScore: true,  offset: 0, count: 2000  }
-      )) as string[];
-
+      "marks_by_expiry",
+      now,
+      "+inf",
+      { byScore: true, limit: { offset: 0, count: 2000 } }
+    )) as string[];
 
     if (!ids.length) return res.json([]);
 
+    // Load mark JSON by id
     const raw = await Promise.all(ids.map((id) => redis.get<string>(`mark:${id}`)));
 
     const marks: Mark[] = raw
-      .filter((v): v is string => typeof v === "string")
-      .map((s: string) => JSON.parse(s) as Mark)
+      .filter((v): v is string => typeof v === "string" && v.trim().startsWith("{"))
+      .map((s) => JSON.parse(s) as Mark)
       .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt));
 
     return res.json(marks);
@@ -135,22 +147,17 @@ setInterval(() => {
 
       // Беремо пачкою, щоб не зробити великий burst
       const expiredIds = (await redis.zrange(
-            "marks_by_expiry",
-            "-inf",
-            now,
-            { byScore: true, offset: 0, count: 1000 }
-          )) as string[];
-
+        "marks_by_expiry",
+        "-inf",
+        now,
+        { byScore: true, limit: { offset: 0, count: 1000 } }
+      )) as string[];
 
       if (!expiredIds.length) return;
 
-      // Прибираємо з індексу
-      const anyRedis = redis as unknown as {
-        zremrangebyscore?: (key: string, min: string, max: string) => Promise<number>;
-      };
-
-      if (typeof anyRedis.zremrangebyscore === "function") {
-        await anyRedis.zremrangebyscore("marks_by_expiry", "-inf", String(now));
+      // Прибираємо з індексу одним викликом, якщо доступно
+      if (typeof r.zremrangebyscore === "function") {
+        await r.zremrangebyscore("marks_by_expiry", "-inf", String(now));
       } else {
         await Promise.all(expiredIds.map((id) => redis.zrem("marks_by_expiry", id)));
       }
