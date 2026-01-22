@@ -33,7 +33,7 @@ export default function MapView({
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <ClickCatcher onClick={onClick} />
-      {marks.map((m) => (
+      {Array.from(new Map(marks.map(m => [m.id, m])).values()).map(m => (
         <Marker key={m.id} position={[m.lat, m.lng]} icon={icon}>
           <MarkerBubble color={m.color} createdAt={m.createdAt} expiresAt={m.expiresAt} street={m.street} />
         </Marker>
